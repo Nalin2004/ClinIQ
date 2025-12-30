@@ -2,7 +2,17 @@ from fastapi import FastAPI
 import pandas as pd
 import os
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data")
 DATA_CACHE = {}
