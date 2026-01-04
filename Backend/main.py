@@ -58,23 +58,42 @@ def overview():
     }
 
 # ---------------- PATIENT DRILLDOWN ---------------- #
-@app.get("/patient")
-def patient_details(subject: str):
-    df = load_file("Study 1_Compiled_EDRR_updated.xlsx")
-    df["Subject"] = df["Subject"].astype(str)
+@app.get("/patients")
+def get_patients():
+    try:
+        df = load_file("Study 1_Compiled_EDRR_updated.xlsx")
+        df.columns = df.columns.str.strip()
 
-    patient = df[df["Subject"] == subject.strip()]
+        df["Subject"] = df["Subject"].astype(str)
 
-    if patient.empty:
-        return {"message": "Subject not found"}
+        df["risk_score"] = (
+            100 - pd.to_numeric(df["Total Open issue Count per subject"], errors="coerce").fillna(0) * 5
+        )
 
-    row = patient.iloc[0]
+        df["risk_score"] = pd.to_numeric(df["risk_score"], errors="coerce").fillna(0)
 
-    return {
-        "subject": str(row["Subject"]),
-        "open_issues": int(row["Total Open issue Count per subject"]),
-        "dqi": float(calculate_dqi(row))
-    }
+        df["risk_level"] = pd.cut(
+            df["risk_score"],
+            bins=[-1, 30, 70, 1000],
+            labels=["Low", "Medium", "High"]
+        )
+
+        # ⛔ DO NOT fillna("") on categorical column
+        df["risk_level"] = df["risk_level"].astype(str)
+
+        result = df[[
+            "Subject",
+            "Total Open issue Count per subject",
+            "risk_score",
+            "risk_level"
+        ]].fillna("").to_dict(orient="records")
+
+        return result
+
+    except Exception as e:
+        return {"error": str(e)}
+
+
 
 # ---------------- SITE PERFORMANCE ENGINE ---------------- #
 @app.get("/sites")
