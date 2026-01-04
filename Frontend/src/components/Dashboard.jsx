@@ -6,39 +6,105 @@ export default function Dashboard() {
   const [overview, setOverview] = useState(null);
   const [sites, setSites] = useState([]);
 
+  const visibleSites = sites.slice(0,6);
+
+const highestRisk = visibleSites.reduce((a, b) => a.risk_score > b.risk_score ? a : b, {});
+const bestSubject = visibleSites.reduce((a, b) => a.risk_score < b.risk_score ? a : b, {});
+const avgRisk = Math.round(
+  visibleSites.reduce((sum, s) => sum + s.risk_score, 0) / (visibleSites.length || 1)
+);
+
+
   useEffect(() => {
     axios.get("http://127.0.0.1:8000/overview").then(res => setOverview(res.data));
     axios.get("http://127.0.0.1:8000/sites").then(res => setSites(res.data));
   }, []);
 
+  const CleanTooltip = ({ active, payload, label }) => {
+  if (!active || !payload || !payload.length) return null;
+
   return (
-    <div className="min-h-screen bg-slate-900 text-white p-6">
-      <h1 className="text-3xl mb-6 font-bold">ClinIQ Dashboard</h1>
-
-      <div className="grid grid-cols-4 gap-6 mb-8">
-        <Card title="Overall DQI" value={overview?.average_dqi} />
-        <Card title="High Risk Subjects" value={overview?.high_risk_subjects} />
-        <Card title="Total Subjects" value={overview?.total_subjects} />
-        <Card title="Pending SAEs" value="12" />
+    <div className="cliniq-tooltip">
+      <div className="cliniq-tooltip-title">{label}</div>
+      <div className="cliniq-tooltip-value">
+        Risk Score: <span>{payload[0].value}%</span>
       </div>
+    </div>
+  );
+};
 
-      <div className="grid grid-cols-3 gap-6">
-        <div className="col-span-2 bg-slate-800 p-4 rounded-xl">
-          <h2 className="mb-4">Site Performance Overview</h2>
-          <BarChart width={500} height={300} data={sites.slice(0,6)}>
-            <XAxis dataKey="Subject" hide />
-            <Tooltip />
-            <Bar dataKey="risk_score" />
-          </BarChart>
+
+  return (
+    <div className="min-h-screen bg-background bg-slate-900 text-white">
+
+      <div className="p-6">
+        <h1 className="p-6-heading">Dashboard</h1>
+
+        <div className="container-fluid mt-4">
+          <div className="row g-4">
+            <div className="col-12 col-md-3"><Card title="Overall DQI" value={overview?.average_dqi} /></div>
+            <div className="col-12 col-md-3"><Card title="High Risk Subjects" value={overview?.high_risk_subjects} /></div>
+            <div className="col-12 col-md-3"><Card title="Total Subjects" value={overview?.total_subjects} /></div>
+            <div className="col-12 col-md-3"><Card title="Pending SAEs" value="12" /></div>
+          </div>
         </div>
 
-        <div className="bg-slate-800 p-4 rounded-xl">
-          <h2>AI Insights</h2>
-          <ul className="mt-4 space-y-3 text-sm">
-            <li>High unresolved issues detected in 5 subjects</li>
-            <li>Recommend CRA review for Subject 78</li>
-            <li>Potential coding backlog in WHO-DD file</li>
-          </ul>
+        <div className="cliniq-site-grid">
+
+<div className="cliniq-site-graph">
+
+  <div className="site-graph-layout">
+
+    {/* BAR GRAPH */}
+    <div>
+      <div className="site-module-title">Site Performance Overview</div>
+      <BarChart width={420} height={260} data={sites.slice(0,6)}>
+        <XAxis dataKey="Subject" tick={{ fill: "#94a3b8", fontSize: 11 }} />
+        <Tooltip content={<CleanTooltip />} cursor={false} />
+        <Bar dataKey="risk_score" fill="#38bdf8" activeBar={false} />
+      </BarChart>
+    </div>
+
+    {/* AI INSIGHTS PANEL */}
+<div className="site-insights">
+  <div className="insight-title">Top Risk Insights</div>
+
+  <p>🔴 Highest Risk: <span>{highestRisk.Subject}</span></p>
+  <p>🟡 Avg Risk: <span>{avgRisk}%</span></p>
+  <p>🟢 Best Subject: <span>{bestSubject.Subject}</span></p>
+  <p>⚠ Risk Trend: <span className="text-warning">Increasing</span></p>
+</div>
+
+
+  </div>
+</div>
+
+
+          {/* TABLE BOX */}
+          <div className="cliniq-site-table">
+
+            <table className="cliniq-table">
+              <thead>
+                <tr className="cliniq-table-header">
+                  <th>Subject</th>
+                  <th>Open Issues</th>
+                  <th>Risk Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sites.slice(0,6).map((s, i) => (
+                  <tr key={i} className="cliniq-table-row">
+                    <td className="cliniq-table-subject">{s.Subject}</td>
+                    <td className="cliniq-table-issues">
+                      {s["Total Open issue Count per subject"]}
+                    </td>
+                    <td className="cliniq-table-risk">{s.risk_score}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
         </div>
       </div>
     </div>
@@ -47,9 +113,9 @@ export default function Dashboard() {
 
 function Card({ title, value }) {
   return (
-    <div className="bg-slate-800 rounded-xl p-4 text-center">
-      <h3 className="text-gray-400">{title}</h3>
-      <p className="text-3xl font-bold mt-2">{value}</p>
+    <div className="cliniq-card">
+      <div className="cliniq-card-title">{title}</div>
+      <p className="cliniq-card-value">{value}</p>
     </div>
   );
 }

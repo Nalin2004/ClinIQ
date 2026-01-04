@@ -1,3 +1,317 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.bg-background {
+    background-color: #001D31;
+}
+
+.navbar .nav-link {
+  position: relative;  
+  color: #ffffff !important;
+  margin-left: 35px;
+  font-size: 17px;
+}
+
+.nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -6px;
+  width: 0%;
+  height: 2px;
+  background: linear-gradient(90deg, #38bdf8, #4ade80);
+  transition: width 0.25s ease;
+  border-radius: 10px;
+}
+
+.nav-link:hover::after {
+  width: 100%;
+}
+.navbar-glow {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+.bg-cliniq {
+  background: #0A1D36;
+}
+
+.navbar-dark .navbar-toggler-icon,
+.navbar-light .navbar-toggler-icon {
+  background-image: none !important;
+  width: 26px;
+  height: 1.7px;
+  background-color: #ffffff !important;
+  position: relative;
+}
+
+.navbar-dark .navbar-toggler-icon::before,
+.navbar-dark .navbar-toggler-icon::after,
+.navbar-light .navbar-toggler-icon::before,
+.navbar-light .navbar-toggler-icon::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  width: 26px;
+  height: 1.7px;
+  background-color: #ffffff !important;
+}
+
+.navbar-dark .navbar-toggler-icon::before,
+.navbar-light .navbar-toggler-icon::before {
+  top: -7px;
+}
+
+.navbar-dark .navbar-toggler-icon::after,
+.navbar-light .navbar-toggler-icon::after {
+  top: 7px;
+}
+.navbar-toggler {
+  border: none !important;
+}
+.navbar-toggler:focus {
+  box-shadow: none !important;
+}
+.p-6-heading{
+  text-align: left;
+  font-size: 35px;
+  margin-left: 22px;
+  text-transform: uppercase;
+}
+.mb-4{
+  text-transform: uppercase;
+}
+.cliniq-card {
+  background: #001D31;
+  border: 1px solid #1e293b;
+  border-radius: 10px;
+  padding: 16px;
+  text-align: center;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.45);
+}
+
+.cliniq-card-title {
+  color: #38bdf8;
+  font-size: 17px;
+  letter-spacing: 1px;
+  padding: 4px 12px;
+  display: inline-block;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+}
+
+.cliniq-card-value {
+  font-size: 30px;
+  font-weight: bold;
+  color: #f8fafc;
+}
+svg *:focus {
+  outline: none !important;
+}
+
+svg {
+  outline: none !important;
+}
+
+.recharts-bar-rectangle {
+  stroke: none !important;
+}
+.holo-bar:hover {
+  filter: drop-shadow(0 0 2px rgba(87, 166, 200, 0.8));
+  transform: scale(1) translateZ(20px);
+}
+
+.recharts-bar-rectangle {
+  transition: transform 0.15s ease, filter 0.5s ease;
+  transform-origin: bottom;
+}
+.cliniq-table {
+  width: 100%;
+  margin-top: 16px;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: #cbd5f5;
+  margin-top: 10px;
+}
+
+.cliniq-table-header th {
+  padding: 10px;
+  border-bottom: 1px solid #1e293b;
+  color: #38bdf8;
+  text-transform: uppercase;
+  font-size: 18px;
+}
+
+/* SUBJECT column */
+.cliniq-table-header th:first-child,
+.cliniq-table-row td:first-child {
+  text-align: left;
+  padding-left: 24px;
+}
+
+/* OPEN ISSUES column */
+.cliniq-table-header th:nth-child(2),
+.cliniq-table-row td:nth-child(2) {
+  text-align: center;
+}
+
+/* RISK SCORE column */
+.cliniq-table-header th:nth-child(3),
+.cliniq-table-row td:nth-child(3) {
+  text-align: center;
+}
+
+
+
+.cliniq-table-row td {
+  padding: 21px;
+  border-bottom: 1px solid #020617;
+}
+
+.cliniq-table-row:hover {
+  background: rgba(56,189,248,0.05);
+}
+
+.cliniq-table-subject {
+  color: #e2e8f0;
+  font-weight: 500;
+}
+
+.cliniq-table-issues {
+  text-align: center;
+  color: #facc15;
+}
+
+.cliniq-table-risk {
+  text-align: center;
+  color: #38bdf8;
+  font-weight: bold;
+}
+.cliniq-site-grid {
+  margin-top: 34px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 26px;
+}
+
+.cliniq-site-graph,
+.cliniq-site-table {
+  background: #001D31;
+  border: 1px solid #1e293b;
+  border-radius: 18px;
+  margin-left: 10px;
+  margin-right: 10px;
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+}
+
+.site-module-title {
+  font-size: 26px;
+  color: #38bdf8;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+.graph-header{
+  text-transform: uppercase;
+  font-size: 30px;
+}
+.site-graph-layout {
+  display: flex;
+  gap: 500px;
+  align-items: center;
+}
+
+.site-insights {
+  min-width: 320px;
+  border: 3px solid #1e293b;
+  border-radius: 8px;
+  padding: 40px;
+  margin-top: 15px;
+
+}
+
+.insight-title {
+  color: #38bdf8;
+  font-weight: 600;
+  margin-bottom: 22px;
+}
+
+.site-insights p {
+  font-size: 18px;
+  margin-bottom: 14px;
+}
+
+.site-insights span {
+  color: #f8fafc;
+  font-weight: 500;
+}
+.cliniq-tooltip {
+  background: linear-gradient(145deg, #020617, #020617);
+  border: 1px solid #1e293b;
+  border-radius: 10px;
+  padding: 10px 14px;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.7);
+}
+
+.cliniq-tooltip-title {
+  color: #38bdf8;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.cliniq-tooltip-value {
+  color: #f8fafc;
+  font-size: 12px;
+}
+
+.cliniq-tooltip-value span {
+  color: #38bdf8;
+}
+.cliniq-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.cliniq-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 14px 30px rgba(0,0,0,0.6);
+}
+
+/*HOMEPAGE*/
+.home-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(100vh);
+  text-align: center;
+  background-color: #001D31;
+}
+
+.home-hero h1 {
+  font-size: 42px;
+  font-weight: 700;
+  color: #38bdf8;
+  margin-bottom: 14px;
+}
+
+.home-hero p {
+  max-width: 560px;
+  color: #cbd5f5;
+  font-size: 15px;
+  margin-bottom: 26px;
+}
+
+.home-btn-primary {
+  background: linear-gradient(135deg, #38bdf8, #4ade80);
+  padding: 10px 26px;
+  border-radius: 999px;
+  color: #020617;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.home-btn-secondary {
+  border: 1px solid #38bdf8;
+  padding: 10px 26px;
+  border-radius: 999px;
+  color: #38bdf8;
+  text-decoration: none;
+}
