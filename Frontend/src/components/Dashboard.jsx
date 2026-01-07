@@ -1,111 +1,122 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api";
 import { BarChart, Bar, XAxis, Tooltip } from "recharts";
 
 export default function Dashboard() {
   const [overview, setOverview] = useState(null);
   const [sites, setSites] = useState([]);
+  const [patients, setPatients] = useState([]);
 
-  const visibleSites = sites.slice(0,6);
+  const visibleSites = sites.slice(0, 6);
+  const visiblePatients = patients.slice(0, 6);
 
-const highestRisk = visibleSites.reduce((a, b) => a.risk_score > b.risk_score ? a : b, {});
-const bestSubject = visibleSites.reduce((a, b) => a.risk_score < b.risk_score ? a : b, {});
-const avgRisk = Math.round(
-  visibleSites.reduce((sum, s) => sum + s.risk_score, 0) / (visibleSites.length || 1)
-);
+  const highestRisk = visiblePatients.length
+    ? visiblePatients.reduce((a, b) => a.risk_score > b.risk_score ? a : b)
+    : null;
 
+  const bestSubject = visiblePatients.length
+    ? visiblePatients.reduce((a, b) => a.risk_score < b.risk_score ? a : b)
+    : null;
+
+  const avgRisk = visiblePatients.length
+    ? Math.round(
+        visiblePatients.reduce((sum, s) => sum + s.risk_score, 0) /
+          visiblePatients.length
+      )
+    : 0;
+
+  const fetchData = async () => {
+    const ov = await api.get("/overview");
+    const st = await api.get("/sites");
+    const pt = await api.get("/patients");
+
+    setOverview(ov.data);
+    setSites(st.data);
+    setPatients(pt.data);
+  };
 
   useEffect(() => {
-    axios.get("http://127.0.0.1:8000/overview").then(res => setOverview(res.data));
-    axios.get("http://127.0.0.1:8000/sites").then(res => setSites(res.data));
+    fetchData();
+    const interval = setInterval(fetchData, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   const CleanTooltip = ({ active, payload, label }) => {
-  if (!active || !payload || !payload.length) return null;
-
-  return (
-    <div className="cliniq-tooltip">
-      <div className="cliniq-tooltip-title">{label}</div>
-      <div className="cliniq-tooltip-value">
-        Risk Score: <span>{payload[0].value}%</span>
+    if (!active || !payload || !payload.length) return null;
+    return (
+      <div className="cliniq-tooltip">
+        <div className="cliniq-tooltip-title">{label}</div>
+        <div className="cliniq-tooltip-value">
+          Risk Score: <span>{payload[0].value}%</span>
+        </div>
       </div>
-    </div>
-  );
-};
-
+    );
+  };
 
   return (
-    <div className="min-h-screen bg-background bg-slate-900 text-white">
+    <div className="min-h-screen bg-background bg-slate-900 text-white p-6">
 
-      <div className="p-6">
-        <h1 className="p-6-heading">Dashboard</h1>
+      <h1 className="p-6-heading">Dashboard</h1>
 
-        <div className="container-fluid mt-4">
-          <div className="row g-4">
-            <div className="col-12 col-md-3"><Card title="Overall DQI" value={overview?.average_dqi} /></div>
-            <div className="col-12 col-md-3"><Card title="High Risk Subjects" value={overview?.high_risk_subjects} /></div>
-            <div className="col-12 col-md-3"><Card title="Total Subjects" value={overview?.total_subjects} /></div>
-            <div className="col-12 col-md-3"><Card title="Pending SAEs" value="12" /></div>
+      {/* TOP STATS */}
+      <div className="container-fluid mt-4">
+        <div className="row g-4">
+          <div className="col-md-3"><Card title="Overall DQI" value={overview?.average_dqi ?? "-"} /></div>
+          <div className="col-md-3"><Card title="High Risk Subjects" value={overview?.high_risk_subjects ?? "-"} /></div>
+          <div className="col-md-3"><Card title="Total Subjects" value={overview?.total_subjects ?? "-"} /></div>
+          <div className="col-md-3"><Card title="Pending SAEs" value="12" /></div>
+        </div>
+      </div>
+
+      {/* GRAPH + INSIGHTS */}
+      <div className="cliniq-site-grid">
+
+        <div className="cliniq-site-graph">
+          <div className="site-graph-layout">
+
+            <div>
+              <div className="site-module-title">Site Performance Overview</div>
+              <BarChart width={420} height={260} data={visibleSites}>
+                <XAxis dataKey="Subject" tick={{ fill: "#94a3b8", fontSize: 11 }} />
+                <Tooltip content={<CleanTooltip />} />
+                <Bar dataKey="risk_score" fill="#38bdf8" />
+              </BarChart>
+            </div>
+
+            {/* 🔥 THIS BOX WAS MISSING */}
+            <div className="site-insights">
+              <div className="insight-title">Top Risk Insights</div>
+              <p>🔴 Highest Risk: <span>{highestRisk?.Subject || "-"}</span></p>
+              <p>🟡 Avg Risk: <span>{avgRisk}%</span></p>
+              <p>🟢 Best Subject: <span>{bestSubject?.Subject || "-"}</span></p>
+              <p>⚠ Risk Trend: <span className="text-warning">Increasing</span></p>
+            </div>
+
           </div>
         </div>
 
-        <div className="cliniq-site-grid">
-
-<div className="cliniq-site-graph">
-
-  <div className="site-graph-layout">
-
-    {/* BAR GRAPH */}
-    <div>
-      <div className="site-module-title">Site Performance Overview</div>
-      <BarChart width={420} height={260} data={sites.slice(0,6)}>
-        <XAxis dataKey="Subject" tick={{ fill: "#94a3b8", fontSize: 11 }} />
-        <Tooltip content={<CleanTooltip />} cursor={false} />
-        <Bar dataKey="risk_score" fill="#38bdf8" activeBar={false} />
-      </BarChart>
-    </div>
-
-    {/* AI INSIGHTS PANEL */}
-<div className="site-insights">
-  <div className="insight-title">Top Risk Insights</div>
-
-  <p>🔴 Highest Risk: <span>{highestRisk.Subject}</span></p>
-  <p>🟡 Avg Risk: <span>{avgRisk}%</span></p>
-  <p>🟢 Best Subject: <span>{bestSubject.Subject}</span></p>
-  <p>⚠ Risk Trend: <span className="text-warning">Increasing</span></p>
-</div>
-
-
-  </div>
-</div>
-
-
-          {/* TABLE BOX */}
-          <div className="cliniq-site-table">
-
-            <table className="cliniq-table">
-              <thead>
-                <tr className="cliniq-table-header">
-                  <th>Subject</th>
-                  <th>Open Issues</th>
-                  <th>Risk Score</th>
+        {/* 🔥 THIS TABLE BOX WAS MISSING */}
+        <div className="cliniq-site-table">
+          <table className="cliniq-table">
+            <thead>
+              <tr className="cliniq-table-header">
+                <th>Subject</th>
+                <th>Open Issues</th>
+                <th>Risk Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visiblePatients.map((p, i) => (
+                <tr key={i} className="cliniq-table-row">
+                  <td>{p.Subject}</td>
+                  <td>{p["Total Open issue Count per subject"]}</td>
+                  <td>{p.risk_score}%</td>
                 </tr>
-              </thead>
-              <tbody>
-                {sites.slice(0,6).map((s, i) => (
-                  <tr key={i} className="cliniq-table-row">
-                    <td className="cliniq-table-subject">{s.Subject}</td>
-                    <td className="cliniq-table-issues">
-                      {s["Total Open issue Count per subject"]}
-                    </td>
-                    <td className="cliniq-table-risk">{s.risk_score}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
+              ))}
+            </tbody>
+          </table>
         </div>
+
       </div>
     </div>
   );

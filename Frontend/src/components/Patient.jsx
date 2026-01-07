@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api";
 
 export default function Patient() {
   const [patients, setPatients] = useState([]);
@@ -7,7 +7,7 @@ export default function Patient() {
   const [filter, setFilter] = useState("All");
 
   useEffect(() => {
-    axios.get("http://127.0.0.1:8000/patients").then(res => setPatients(res.data));
+    api.get("/patients").then(res => setPatients(res.data));
   }, []);
 
   const filtered = patients.filter(p =>
