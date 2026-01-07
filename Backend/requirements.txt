@@ -9,3 +9,4 @@ bcrypt
 python-multipart
 passlib[bcrypt]
 python-dotenv
+psycopg2-binary
