@@ -1,10 +1,11 @@
 fastapi
 uvicorn
 sqlalchemy
-pandas
 python-jose
-passlib
+email-validator
+pandas
+openpyxl
 bcrypt
 python-multipart
-alembic
-psycopg2-binary
+passlib[bcrypt]
+python-dotenv
