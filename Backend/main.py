@@ -1,36 +1,28 @@
 import os
-import pandas as pd
 import bcrypt
+import pandas as pd
+from datetime import datetime, timedelta
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-from jose import jwt
-from datetime import datetime, timedelta
+from jose import jwt, JWTError
 
 from database import SessionLocal, engine
 from models import User
 from schemas import UserCreate, Login
-import re
 
-
-BCRYPT_PATTERN = re.compile(r"^\$2[aby]\$")
 
 # ---------------- CONFIG ---------------- #
-
-SECRET_KEY = os.getenv("JWT_SECRET")
-if not SECRET_KEY:
-    raise RuntimeError("JWT_SECRET environment variable is not set")
-
+SECRET_KEY = os.getenv("JWT_SECRET", "local_dev_secret")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 security = HTTPBearer()
 app = FastAPI()
 
-# ---------------- CORS ---------------- #
 
+# ---------------- CORS ---------------- #
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -44,8 +36,8 @@ app.add_middleware(
 
 User.metadata.create_all(bind=engine)
 
-# ---------------- DB ---------------- #
 
+# ---------------- DB ---------------- #
 def get_db():
     db = SessionLocal()
     try:
@@ -53,25 +45,16 @@ def get_db():
     finally:
         db.close()
 
-# ---------------- PASSWORD ---------------- #
 
-def hash_password(password: str) -> str:
+# ---------------- PASSWORD ---------------- #
+def hash_password(password: str):
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
-def verify_password(password: str, hashed: str) -> bool:
-    try:
-        # bcrypt format
-        if BCRYPT_PATTERN.match(hashed):
-            return bcrypt.checkpw(password.encode(), hashed.encode())
-        else:
-            # legacy sha256
-            return hashlib.sha256(password.encode()).hexdigest() == hashed
-    except:
-        return False
+def verify_password(password: str, hashed: str):
+    return bcrypt.checkpw(password.encode(), hashed.encode())
 
 
 # ---------------- JWT ---------------- #
-
 def create_token(data: dict):
     payload = data.copy()
     payload["exp"] = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -79,19 +62,20 @@ def create_token(data: dict):
 
 def get_current_user(token: HTTPAuthorizationCredentials = Depends(security)):
     try:
-        return jwt.decode(token.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-    except:
+        payload = jwt.decode(token.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
         raise HTTPException(403, "Invalid or expired token")
 
 def require_admin(user=Depends(get_current_user)):
     if user.get("role") != "admin":
-        raise HTTPException(403, "Admins only")
+        raise HTTPException(403, "Admin access required")
     return user
 
-# ---------------- FILE LOADER ---------------- #
 
+# ---------------- FILE LOADER ---------------- #
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_PATH = os.path.join(BASE_DIR, "Data")
+DATA_PATH = os.path.join(BASE_DIR, "..", "Data")
 CACHE = {}
 
 def load_file(file):
@@ -105,52 +89,53 @@ def load_file(file):
 def calculate_risk(col):
     return pd.to_numeric(col, errors="coerce").fillna(0) * 5
 
-# ---------------- AUTH ---------------- #
 
+# ---------------- HOME ---------------- #
+@app.get("/")
+def home():
+    return {"status": "ClinIQ backend running"}
+
+
+# ---------------- AUTH ---------------- #
 @app.post("/signup")
 def signup(user: UserCreate, db: Session = Depends(get_db)):
+    if db.query(User).filter(User.email == user.email).first():
+        raise HTTPException(400, "Email already registered")
+
     new_user = User(
         name=user.name,
         email=user.email,
         hashed_password=hash_password(user.password),
         role="user"
     )
+
     db.add(new_user)
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(400, "Email already registered")
+    db.commit()
     return {"status": "Account created"}
+
 
 @app.post("/login")
 def login(data: Login, db: Session = Depends(get_db)):
-    u = db.query(User).filter(User.email == data.email).first()
-    if not u:
+    user = db.query(User).filter(User.email == data.email).first()
+    if not user or not verify_password(data.password, user.hashed_password):
         raise HTTPException(401, "Invalid credentials")
-
-    # verify password
-    if not verify_password(data.password, u.hashed_password):
-        raise HTTPException(401, "Invalid credentials")
-
-    # 🔁 auto-upgrade old sha256 hashes to bcrypt
-    if not u.hashed_password.startswith("$2"):
-        u.hashed_password = hash_password(data.password)
-        db.commit()
 
     token = create_token({
-        "user_id": u.id,
-        "name": u.name,
-        "role": u.role
+        "user_id": user.id,
+        "name": user.name,
+        "role": user.role
     })
 
-    return {"token": token, "name": u.name, "role": u.role}
+    return {
+        "token": token,
+        "name": user.name,
+        "role": user.role
+    }
 
 
 # ---------------- OVERVIEW ---------------- #
-
 @app.get("/overview")
-def get_overview(user=Depends(require_admin)):
+def overview(user=Depends(require_admin)):
     df = load_file("Study 1_Compiled_EDRR_updated.xlsx")
     df["risk_score"] = calculate_risk(df["Total Open issue Count per subject"])
     df["DQI"] = 100 - df["risk_score"]
@@ -161,39 +146,53 @@ def get_overview(user=Depends(require_admin)):
         "total_subjects": len(df)
     }
 
-# ---------------- PATIENTS ---------------- #
 
+# ---------------- PATIENTS ---------------- #
 @app.get("/patients")
-def get_patients(user=Depends(require_admin)):
+def patients(user=Depends(require_admin)):
     df = load_file("Study 1_Compiled_EDRR_updated.xlsx")
     df["risk_score"] = calculate_risk(df["Total Open issue Count per subject"])
-    df["risk_level"] = pd.cut(df["risk_score"], [-1,30,70,1000], labels=["Low","Medium","High"]).astype(str)
-    return df[["Subject","Total Open issue Count per subject","risk_score","risk_level"]].to_dict("records")
+    df["risk_level"] = pd.cut(df["risk_score"], [-1,30,70,1000],
+                               labels=["Low","Medium","High"]).astype(str)
+
+    return df[[
+        "Subject",
+        "Total Open issue Count per subject",
+        "risk_score",
+        "risk_level"
+    ]].to_dict("records")
+
 
 # ---------------- SITES ---------------- #
-
 @app.get("/sites")
-def get_sites(user=Depends(require_admin)):
+def sites(user=Depends(require_admin)):
     df = load_file("Study 1_Compiled_EDRR_updated.xlsx")
     df["risk_score"] = calculate_risk(df["Total Open issue Count per subject"])
-    return df[["Subject","Total Open issue Count per subject","risk_score"]].to_dict("records")
+
+    return df[[
+        "Subject",
+        "Total Open issue Count per subject",
+        "risk_score"
+    ]].to_dict("records")
+
 
 # ---------------- AI INSIGHTS ---------------- #
-
 @app.get("/ai-insights")
-def get_ai_insights(user=Depends(require_admin)):
+def ai_insights(user=Depends(require_admin)):
     df = load_file("Study 1_Compiled_EDRR_updated.xlsx")
     df["risk_score"] = calculate_risk(df["Total Open issue Count per subject"])
     top = df.sort_values("risk_score", ascending=False).head(3)
+
+    avg = int(df["risk_score"].mean())
 
     return {
         "alerts": [f"{r['Subject']} at {int(r['risk_score'])}% risk" for _,r in top.iterrows()],
         "reasons": ["System stable – no critical systemic risks detected"],
         "recommended_actions": ["Continue routine monitoring"],
-        "readmission_risk": int(df["risk_score"].mean()),
+        "readmission_risk": avg,
         "graph": [
-            {"factor":"Comorbidities","value":int(df["risk_score"].mean()//2)},
-            {"factor":"Medication","value":int(df["risk_score"].mean()//1.5)},
-            {"factor":"Admissions","value":int(df["risk_score"].mean())}
+            {"factor":"Comorbidities","value":avg//2},
+            {"factor":"Medication","value":avg//1.5},
+            {"factor":"Admissions","value":avg}
         ]
     }
