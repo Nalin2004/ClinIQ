@@ -12,7 +12,7 @@ export default function Signup() {
     e.preventDefault();
 
     try {
-      await axios.post("/signup", {
+      await api.post("/signup", {
         name,
         email,
         password
