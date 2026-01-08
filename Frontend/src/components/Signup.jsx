@@ -12,7 +12,7 @@ export default function Signup() {
     e.preventDefault();
 
     try {
-      await axios.post("http://127.0.0.1:8000/signup", {
+      await axios.post("/signup", {
         name,
         email,
         password
