@@ -12,6 +12,10 @@ from datetime import datetime, timedelta
 from database import SessionLocal, engine
 from models import User
 from schemas import UserCreate, Login
+import re
+
+
+BCRYPT_PATTERN = re.compile(r"^\$2[aby]\$")
 
 # ---------------- CONFIG ---------------- #
 
@@ -55,7 +59,16 @@ def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 def verify_password(password: str, hashed: str) -> bool:
-    return bcrypt.checkpw(password.encode(), hashed.encode())
+    try:
+        # bcrypt format
+        if BCRYPT_PATTERN.match(hashed):
+            return bcrypt.checkpw(password.encode(), hashed.encode())
+        else:
+            # legacy sha256
+            return hashlib.sha256(password.encode()).hexdigest() == hashed
+    except:
+        return False
+
 
 # ---------------- JWT ---------------- #
 
@@ -113,8 +126,17 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
 @app.post("/login")
 def login(data: Login, db: Session = Depends(get_db)):
     u = db.query(User).filter(User.email == data.email).first()
-    if not u or not verify_password(data.password, u.hashed_password):
+    if not u:
         raise HTTPException(401, "Invalid credentials")
+
+    # verify password
+    if not verify_password(data.password, u.hashed_password):
+        raise HTTPException(401, "Invalid credentials")
+
+    # 🔁 auto-upgrade old sha256 hashes to bcrypt
+    if not u.hashed_password.startswith("$2"):
+        u.hashed_password = hash_password(data.password)
+        db.commit()
 
     token = create_token({
         "user_id": u.id,
@@ -123,6 +145,7 @@ def login(data: Login, db: Session = Depends(get_db)):
     })
 
     return {"token": token, "name": u.name, "role": u.role}
+
 
 # ---------------- OVERVIEW ---------------- #
 
