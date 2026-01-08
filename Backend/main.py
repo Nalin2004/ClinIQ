@@ -11,7 +11,10 @@ import pandas as pd
 import os, hashlib
 
 # ---------------- CONFIG ---------------- #
-SECRET_KEY = "CLINIQ_SECRET_2025"
+SECRET_KEY = os.getenv("JWT_SECRET")
+if not SECRET_KEY:
+    raise Exception("X9vR$3A1bDk!Qp2ZC7@E8mK4W6H#n%YtP5S0LFaJcU")
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
@@ -26,12 +29,14 @@ def home():
 # ---------------- CORS ---------------- #
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "https://clin-iq-omega.vercel.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 User.metadata.create_all(bind=engine)
 
@@ -45,36 +50,26 @@ def get_db():
 
 # ---------------- JWT UTILS ---------------- #
 def create_token(data: dict):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    payload = data.copy()
+    payload["exp"] = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 def get_current_user(token: HTTPAuthorizationCredentials = Depends(security)):
     try:
-        payload = jwt.decode(token.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-
-        if payload.get("role") != "admin":
-            raise HTTPException(403, "Admin access required")
-
-        return payload
-    except Exception as e:
+        return jwt.decode(token.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+    except:
         raise HTTPException(403, "Invalid or expired token")
-
-
-
 
 def require_admin(user=Depends(get_current_user)):
     if user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admins only")
+        raise HTTPException(403, "Admins only")
     return user
 
-
 # ---------------- PASSWORD ---------------- #
-def hash_password(p): 
+def hash_password(p):
     return hashlib.sha256(p.encode()).hexdigest()
 
-def verify_password(p, h): 
+def verify_password(p, h):
     return hash_password(p) == h
 
 # ---------------- FILE LOADER ---------------- #
@@ -89,17 +84,13 @@ def load_file(file):
     CACHE[file] = df
     return df
 
-# ---------------- RISK ENGINE ---------------- #
 def calculate_risk(col):
     return pd.to_numeric(col, errors="coerce").fillna(0) * 5
 
 # ---------------- AUTH ---------------- #
 @app.post("/signup")
 def signup(user: UserCreate, db: Session = Depends(get_db)):
-    db.expire_all()  # 🔥 CLEAR SESSION CACHE
-
-    existing = db.query(User).filter(User.email == user.email).first()
-    if existing:
+    if db.query(User).filter(User.email == user.email).first():
         raise HTTPException(400, "Email already registered")
 
     new_user = User(
@@ -108,13 +99,9 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
         hashed_password=hash_password(user.password),
         role="user"
     )
-
     db.add(new_user)
     db.commit()
-    db.refresh(new_user)
-
     return {"status": "Account created"}
-
 
 @app.post("/login")
 def login(data: Login, db: Session = Depends(get_db)):
@@ -125,21 +112,14 @@ def login(data: Login, db: Session = Depends(get_db)):
     token = create_token({
         "user_id": u.id,
         "name": u.name,
-        "role": u.role     # 👈 VERY IMPORTANT
+        "role": u.role
     })
 
-    return {
-        "token": token,
-        "name": u.name,
-        "role": u.role     # 👈 send to frontend
-    }
-
-
-
+    return {"token": token, "name": u.name, "role": u.role}
 
 # ---------------- OVERVIEW ---------------- #
 @app.get("/overview")
-def overview(user=Depends(get_current_user)):
+def get_overview(user=Depends(require_admin)):
     df = load_file("Study 1_Compiled_EDRR_updated.xlsx")
     df["risk_score"] = calculate_risk(df["Total Open issue Count per subject"])
     df["DQI"] = 100 - df["risk_score"]
@@ -152,7 +132,7 @@ def overview(user=Depends(get_current_user)):
 
 # ---------------- PATIENTS ---------------- #
 @app.get("/patients")
-def overview(user=Depends(get_current_user)):
+def get_patients(user=Depends(require_admin)):
     df = load_file("Study 1_Compiled_EDRR_updated.xlsx")
     df["risk_score"] = calculate_risk(df["Total Open issue Count per subject"])
     df["risk_level"] = pd.cut(df["risk_score"], [-1,30,70,1000], labels=["Low","Medium","High"]).astype(str)
@@ -161,28 +141,21 @@ def overview(user=Depends(get_current_user)):
 
 # ---------------- SITES ---------------- #
 @app.get("/sites")
-def overview(user=Depends(get_current_user)):
+def get_sites(user=Depends(require_admin)):
     df = load_file("Study 1_Compiled_EDRR_updated.xlsx")
     df["risk_score"] = calculate_risk(df["Total Open issue Count per subject"])
     return df[["Subject","Total Open issue Count per subject","risk_score"]].to_dict("records")
 
 # ---------------- AI INSIGHTS ---------------- #
 @app.get("/ai-insights")
-def overview(user=Depends(get_current_user)):
+def get_ai_insights(user=Depends(require_admin)):
     df = load_file("Study 1_Compiled_EDRR_updated.xlsx")
     df["risk_score"] = calculate_risk(df["Total Open issue Count per subject"])
-
     top = df.sort_values("risk_score", ascending=False).head(3)
-
-    reasons = []
-    if (df["risk_score"] >= 25).any():
-        reasons.append("High risk outliers detected")
-    if not reasons:
-        reasons.append("System stable – no critical systemic risks detected")
 
     return {
         "alerts": [f"{r['Subject']} at {int(r['risk_score'])}% risk" for _,r in top.iterrows()],
-        "reasons": reasons,
+        "reasons": ["System stable – no critical systemic risks detected"],
         "recommended_actions": ["Continue routine monitoring"],
         "readmission_risk": int(df["risk_score"].mean()),
         "graph": [

@@ -13,7 +13,7 @@ export default function Navbar() {
   return (
     <nav className="navbar navbar-expand-lg bg-cliniq px-4 navbar-glow">
       <Link to="/" className="navbar-brand logo">
-        <img src="/public/logo.png" height="35" />
+        <img src="/logo.png" height="35" />
       </Link>
 
       <button
