@@ -1,19 +1,23 @@
+import os
+import pandas as pd
+import bcrypt
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+from jose import jwt
+from datetime import datetime, timedelta
+
 from database import SessionLocal, engine
 from models import User
 from schemas import UserCreate, Login
-from jose import jwt
-from datetime import datetime, timedelta
-import pandas as pd
-import os, hashlib
 
 # ---------------- CONFIG ---------------- #
+
 SECRET_KEY = os.getenv("JWT_SECRET")
 if not SECRET_KEY:
-    raise Exception("X9vR$3A1bDk!Qp2ZC7@E8mK4W6H#n%YtP5S0LFaJcU")
+    raise RuntimeError("JWT_SECRET environment variable is not set")
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
@@ -21,12 +25,8 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60
 security = HTTPBearer()
 app = FastAPI()
 
-# ---------------- HOME ---------------- #
-@app.get("/")
-def home():
-    return {"status": "ClinIQ backend running"}
-
 # ---------------- CORS ---------------- #
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -41,6 +41,7 @@ app.add_middleware(
 User.metadata.create_all(bind=engine)
 
 # ---------------- DB ---------------- #
+
 def get_db():
     db = SessionLocal()
     try:
@@ -48,7 +49,16 @@ def get_db():
     finally:
         db.close()
 
-# ---------------- JWT UTILS ---------------- #
+# ---------------- PASSWORD ---------------- #
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+def verify_password(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(password.encode(), hashed.encode())
+
+# ---------------- JWT ---------------- #
+
 def create_token(data: dict):
     payload = data.copy()
     payload["exp"] = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -65,15 +75,10 @@ def require_admin(user=Depends(get_current_user)):
         raise HTTPException(403, "Admins only")
     return user
 
-# ---------------- PASSWORD ---------------- #
-def hash_password(p):
-    return hashlib.sha256(p.encode()).hexdigest()
-
-def verify_password(p, h):
-    return hash_password(p) == h
-
 # ---------------- FILE LOADER ---------------- #
-DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data")
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_PATH = os.path.join(BASE_DIR, "Data")
 CACHE = {}
 
 def load_file(file):
@@ -88,11 +93,9 @@ def calculate_risk(col):
     return pd.to_numeric(col, errors="coerce").fillna(0) * 5
 
 # ---------------- AUTH ---------------- #
+
 @app.post("/signup")
 def signup(user: UserCreate, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.email == user.email).first():
-        raise HTTPException(400, "Email already registered")
-
     new_user = User(
         name=user.name,
         email=user.email,
@@ -100,7 +103,11 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
         role="user"
     )
     db.add(new_user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(400, "Email already registered")
     return {"status": "Account created"}
 
 @app.post("/login")
@@ -118,6 +125,7 @@ def login(data: Login, db: Session = Depends(get_db)):
     return {"token": token, "name": u.name, "role": u.role}
 
 # ---------------- OVERVIEW ---------------- #
+
 @app.get("/overview")
 def get_overview(user=Depends(require_admin)):
     df = load_file("Study 1_Compiled_EDRR_updated.xlsx")
@@ -131,15 +139,16 @@ def get_overview(user=Depends(require_admin)):
     }
 
 # ---------------- PATIENTS ---------------- #
+
 @app.get("/patients")
 def get_patients(user=Depends(require_admin)):
     df = load_file("Study 1_Compiled_EDRR_updated.xlsx")
     df["risk_score"] = calculate_risk(df["Total Open issue Count per subject"])
     df["risk_level"] = pd.cut(df["risk_score"], [-1,30,70,1000], labels=["Low","Medium","High"]).astype(str)
-
     return df[["Subject","Total Open issue Count per subject","risk_score","risk_level"]].to_dict("records")
 
 # ---------------- SITES ---------------- #
+
 @app.get("/sites")
 def get_sites(user=Depends(require_admin)):
     df = load_file("Study 1_Compiled_EDRR_updated.xlsx")
@@ -147,6 +156,7 @@ def get_sites(user=Depends(require_admin)):
     return df[["Subject","Total Open issue Count per subject","risk_score"]].to_dict("records")
 
 # ---------------- AI INSIGHTS ---------------- #
+
 @app.get("/ai-insights")
 def get_ai_insights(user=Depends(require_admin)):
     df = load_file("Study 1_Compiled_EDRR_updated.xlsx")
