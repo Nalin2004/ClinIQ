@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import api from "../api";
 import { BarChart, Bar, XAxis, Tooltip } from "recharts";
+import { useTranslation } from "react-i18next";
 
 export default function Dashboard() {
   const [overview, setOverview] = useState(null);
   const [sites, setSites] = useState([]);
   const [patients, setPatients] = useState([]);
-
+  const {t} = useTranslation();
   const visibleSites = sites.slice(0, 6);
   const visiblePatients = patients.slice(0, 6);
 

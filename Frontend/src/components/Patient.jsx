@@ -1,73 +1,54 @@
-import { useEffect, useState } from "react";
-import api from "../api";
+import { useState } from "react";
 
 export default function Patient() {
-  const [patients, setPatients] = useState([]);
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("All");
 
-  useEffect(() => {
-    api.get("/patients").then(res => setPatients(res.data));
-  }, []);
+  const [form, setForm] = useState({
+    name:"",
+    age:"",
+    country:"",
+    symptoms:"",
+    chronic:"",
+    medications:"",
+    issues:""
+  });
 
-  const filtered = patients.filter(p =>
-    p.Subject.toLowerCase().includes(search.toLowerCase()) &&
-    (filter === "All" || p.risk_level === filter)
-  );
+  const [risk,setRisk]=useState(null);
+  const [lessons,setLessons]=useState([]);
+  const [lesson,setLesson]=useState("");
+
+  const handle = e=>{
+    setForm({...form,[e.target.name]:e.target.value});
+  };
+
+  const submit = ()=>{
+    const r = form.issues * 5 + (form.chronic?10:0);
+    setRisk(r);
+  };
 
   return (
-    <div className="cliniq-patient-wrapper">
-  <h1 className="cliniq-page-title">Patient Registry</h1>
+    <div className="patient-wrapper">
 
-      <div className="cliniq-patient-filters">
-        <input
-          placeholder="Search subject..."
-          onChange={e => setSearch(e.target.value)}
-        />
+      <h1>🩺 Patient Clinical Questionnaire</h1>
 
-        <select onChange={e => setFilter(e.target.value)}>
-          <option>All</option>
-          <option>High</option>
-          <option>Medium</option>
-          <option>Low</option>
-        </select>
+      <div className="patient-form">
+        <input name="name" placeholder="Full Name" onChange={handle}/>
+        <input name="age" placeholder="Age" onChange={handle}/>
+        <input name="country" placeholder="Country" onChange={handle}/>
+        <textarea name="symptoms" placeholder="Describe Symptoms" onChange={handle}/>
+        <textarea name="chronic" placeholder="Any chronic diseases?" onChange={handle}/>
+        <textarea name="medications" placeholder="Current medications" onChange={handle}/>
+        <input name="issues" type="number" placeholder="Open Issues Count" onChange={handle}/>
+
+        <button onClick={submit}>Analyze Risk</button>
       </div>
 
-        <div className="cliniq-patient-card">
-    <table className="cliniq-patient-table">
-        <thead>
-          <tr>
-            <th>Subject</th>
-            <th>Open Issues</th>
-            <th>Risk</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filtered.map((p, i) => (
-            <tr key={i}>
-              <td>{p.Subject}</td>
-            <td>{p["Total Open issue Count per subject"]}</td>
+      {risk !== null && (
+        <div className="risk-card">
+          <h2>⚠ Risk Score: {risk}%</h2>
+          <p>Status: {risk>40?"High Risk":risk>20?"Moderate":"Low Risk"}</p>
+        </div>
+      )}
 
-<td>
-  <span
-    className={`cliniq-risk-pill ${
-      p.risk_score > 70 ? "risk-high" :
-      p.risk_score > 30 ? "risk-mid" :
-      "risk-low"
-    }`}
-  >
-    {p.risk_score}%
-  </span>
-</td>
-
-<td>{p.risk_score > 70 ? "Review" : "Active"}</td>
-
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
-     </div>
   );
 }
