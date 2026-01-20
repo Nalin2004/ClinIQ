@@ -4,7 +4,7 @@ export default function Navbar() {
   return (
     <nav className="navbar navbar-expand-lg navbar-light bg-cliniq px-4 navbar-glow">
       <Link to="/" className="logo">
-        <img src="/src/images/logo.png" height="35" />
+        <img src="../logo.png" height="35" />
       </Link>
 
       <div className="collapse navbar-collapse">
