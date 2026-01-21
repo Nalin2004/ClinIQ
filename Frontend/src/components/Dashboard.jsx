@@ -7,16 +7,23 @@ export default function Dashboard() {
   const [overview, setOverview] = useState(null);
   const [sites, setSites] = useState([]);
   const [patients, setPatients] = useState([]);
-  const {t} = useTranslation();
+  const [loading, setLoading] = useState(true);
+
+  const { t } = useTranslation();
+
   const visibleSites = sites.slice(0, 6);
   const visiblePatients = patients.slice(0, 6);
 
   const highestRisk = visiblePatients.length
-    ? visiblePatients.reduce((a, b) => a.risk_score > b.risk_score ? a : b)
+    ? visiblePatients.reduce((a, b) =>
+        a.risk_score > b.risk_score ? a : b
+      )
     : null;
 
   const bestSubject = visiblePatients.length
-    ? visiblePatients.reduce((a, b) => a.risk_score < b.risk_score ? a : b)
+    ? visiblePatients.reduce((a, b) =>
+        a.risk_score < b.risk_score ? a : b
+      )
     : null;
 
   const avgRisk = visiblePatients.length
@@ -27,13 +34,23 @@ export default function Dashboard() {
     : 0;
 
   const fetchData = async () => {
-    const ov = await api.get("/overview");
-    const st = await api.get("/sites");
-    const pt = await api.get("/patients");
+    try {
+      setLoading(true);
 
-    setOverview(ov.data);
-    setSites(st.data);
-    setPatients(pt.data);
+      const [ov, st, pt] = await Promise.all([
+        api.get("/overview"),
+        api.get("/sites"),
+        api.get("/patients"),
+      ]);
+
+      setOverview(ov.data);
+      setSites(st.data);
+      setPatients(pt.data);
+    } catch (err) {
+      console.error("Dashboard load error:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -54,6 +71,17 @@ export default function Dashboard() {
     );
   };
 
+  /* 🔥 LOADING SCREEN — SAME UX AS AI INSIGHTS */
+  if (loading) {
+    return (
+      <div className="ai-container ai-loading-screen">
+        <div className="ai-loader">
+          Analyzing clinical signals… Please wait a while before the data loads in 
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background bg-slate-900 text-white p-6">
 
@@ -62,10 +90,18 @@ export default function Dashboard() {
       {/* TOP STATS */}
       <div className="container-fluid mt-4">
         <div className="row g-4">
-          <div className="col-md-3"><Card title="Overall DQI" value={overview?.average_dqi ?? "-"} /></div>
-          <div className="col-md-3"><Card title="High Risk Subjects" value={overview?.high_risk_subjects ?? "-"} /></div>
-          <div className="col-md-3"><Card title="Total Subjects" value={overview?.total_subjects ?? "-"} /></div>
-          <div className="col-md-3"><Card title="Pending SAEs" value="12" /></div>
+          <div className="col-md-3">
+            <Card title="Overall DQI" value={overview?.average_dqi ?? "-"} />
+          </div>
+          <div className="col-md-3">
+            <Card title="High Risk Subjects" value={overview?.high_risk_subjects ?? "-"} />
+          </div>
+          <div className="col-md-3">
+            <Card title="Total Subjects" value={overview?.total_subjects ?? "-"} />
+          </div>
+          <div className="col-md-3">
+            <Card title="Pending SAEs" value="12" />
+          </div>
         </div>
       </div>
 
@@ -84,7 +120,6 @@ export default function Dashboard() {
               </BarChart>
             </div>
 
-            {/* 🔥 THIS BOX WAS MISSING */}
             <div className="site-insights">
               <div className="insight-title">Top Risk Insights</div>
               <p>🔴 Highest Risk: <span>{highestRisk?.Subject || "-"}</span></p>
@@ -96,7 +131,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* 🔥 THIS TABLE BOX WAS MISSING */}
+        {/* TABLE */}
         <div className="cliniq-site-table">
           <table className="cliniq-table">
             <thead>
